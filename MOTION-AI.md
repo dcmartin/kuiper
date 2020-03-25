@@ -6,15 +6,18 @@ In this scenario the [`motion`](http://github.com/dcmartin/hassio-addons/tree/ma
 
 The `kuiper` software provides a relay from the `local` MQTT broker to the `master` MQTT broker, but only transmits a limited set of information, notably the `count` of entities annotated, an _array_ of each entity type and count, and the motion detection event `device` and `camera`.
 
-Sensor|Broker|Host|Network|
-----|----|----|----|----|---|
-`motion`|`local`|`rpi`|_localhost_||
-`yolo4motion`|`local`|`rpi`|_localhost_ ||
-`mqtt`|`local`|`rpi`|_localhost_|
-`kuiper`|`local`|`rpi`|_localhost_ & _LAN_|
-`homeassistant`|`master`|`gateway`|_LAN_|
+_Actor_|Subscribe|Publish|Network
+----|----|----|----
+`motion`|`local`|`local`|_localhost_
+`yolo4motion`|`local`|`local`|_localhost_
+`mqtt`|`local`|`local`|_localhost_
+`kuiper`|`local`|`master`|_localhost_ & LAN
+`homeassistant`|`master`|`master`|LAN
 
-The this example the `local` MQTT broker is: `127.0.0.1` and the `master` MQTT broker is: `192.168.1.50`
+In this example:
+
++ `local` - `127.0.0.1`
++ `master` - `192.168.1.50`
 
 
 ## Start `kuiper`
