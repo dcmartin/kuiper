@@ -27,7 +27,7 @@ and the [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/R
 
 
 ```
-export MQTT_HOST=192.168.1.50
+export MQTT_HOST=127.0.0.1
 export MQTT_USERNAME=username
 export MQTT_PASSWORD=password
 export MQTT_PORT=1883
@@ -81,7 +81,7 @@ Produces an output similar to the following (with notable redactions for BASE64 
   "payload": "image/end",
   "topic": "motion/+/+",
   "services": [ { "name": "mqtt", "url": "http://mqtt" } ],
-  "mqtt": { "host": "192.168.1.50", "port": 1883, "username": "username", "password": "password" },
+  "mqtt": { "host": "127.0.0.1", "port": 1883, "username": "username", "password": "password" },
   "yolo": {
     "log_level": "debug",
     "debug": false,
@@ -189,9 +189,10 @@ select * from motion_annotated where count > 0;
 quit
 ```
 
-Rules may also be defined using a JSON structure.  There are two types of `actions` available: `log` to record to a log file or standard output; and `mqtt` to publish the SQL results as JSON, for example:
+Rules may also be defined using a JSON structure.  There are two types of `actions` available: `log` to record to a log file or standard output; and `mqtt` to publish the SQL results as JSON, for example to publish to the `master` MQTT broker:
 
 ```
+export MQTT_HOST=192.168.1.50
 cat > motion_detected.json << EOF
 {
   "sql": "SELECT * from motion_annotated where count > 0",
