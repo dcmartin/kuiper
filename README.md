@@ -1,170 +1,369 @@
-# EMQ X Kuiper - An edge lightweight IoT data analytics software
+# `openkuiper`
 
-[English](README.md) | [简体中文](README-CN.md)
+This repository is a fork of the [primary repository](https://github.com/emqx/kuiper) with minor modifications. The [Open Horizon](http://github.com/dcmartin/open-horizon) _service_ [`mqtt2mqtt`](http://github.com/dcmartin/open-horizon/tree/master/services/mqtt2mqtt/README.md) utilizes this repository to build Docker containers.  Please refer to the [Dockerfile](http://github.com/dcmartin/open-horizon/tree/master/services/mqtt2mqtt/Dockerfile) for details.
 
-## Overview
+## &#128738;`kuiper4motion` - `SQL` directed `MQTT` relay
 
-EMQ X Kuiper is an edge lightweight IoT data analytics / streaming software implemented by Golang, and it can be run at all kinds of resource constrained edge devices. One goal of Kuiper is to migrate the cloud streaming software frameworks (such as [Apache Spark](https://spark.apache.org)，[Apache Storm](https://storm.apache.org) and [Apache Flink](https://flink.apache.org)) to edge side.  Kuiper references these cloud streaming frameworks, and also considered special requirement of edge analytics, and introduced **rule engine**, which is based on ``Source``, ``SQL (business logic)`` and ``Sink``, rule engine is used for developing streaming applications at edge side.
+This document describes an example use-case for [`kuiper`](http://github.com/dcmartin/kuiper) relaying MQTT traffic for [Motion &Atilde;&#128065;](http://github.com/dcmartin/motion-ai) which provides a set of AI assistants for situational awareness from Web cameras using a combination of the following components:
 
-![arch](docs/resources/arch.png)
++ [Home Assistant](http://home-assistant.io) 
++ Home Assistant _add-on_ [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md) 
++ [Open Horizon](http://github.com/open-horizon) _edge_ service [`yolo4motion`](http://github.com/dcmartin/open-horizon/tree/master/services/yolo4motion/README.md)
 
-**User scenarios**
 
-It can be run at various IoT edge use scenarios, such as real-time processing of production line data in the IIoT; Gateway of Connected Vehicle analyze the data from data-bus in real time; Real-time analysis of urban facility data in smart city scenarios. Kuiper processing at the edge can reduce system response latency, save network bandwidth and storage costs, and improve system security.
+### Operational Scenario
 
-## Features
+In this scenario the [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md) _add-on_ for [Home Assistant](http://home-assistant.io) publishes motion detection events to an MQTT broker running on the same device.  The motion detection JSON payloads are consumed by [`yolo4motion`](http://github.com/dcmartin/open-horizon/tree/master/services/yolo4motion/README.md), an [Open Horizon](http://github.com/open-horizon) _edge_ service, which provides object detection and classification using [OpenYOLO](http://github.com/dcmartin/openyolo).
 
-- Lightweight
+The `kuiper` software provides a relay from the `local` MQTT broker to the `master` MQTT broker, but only transmits a limited set of information, notably the `count` of entities annotated, an _array_ of each entity type and count, and the motion detection event `device` and `camera`.
 
-  - Core server package is only about 4.5M, initial memory footprint is about 10MB
+In this example:
 
-- Cross-platform
++ `local` - `127.0.0.1`
++ `master` - `192.168.1.50`
 
-  - CPU Arch：X86 AMD * 32, X86 AMD * 64; ARM * 32, ARM * 64; PPC
-  - The popular Linux distributions, OpenWrt Linux, MacOS and Docker
-  - Industrial PC, Raspberry Pi, industrial gateway, home gateway, MEC edge cloud server
+_Actor_|Subscribe|Publish|Network
+----|----|----|----
+`motion`|`local`|`local`|_localhost_
+`yolo4motion`|`local`|`local`|_localhost_
+`mqtt`|`local`|`local`|_localhost_
+`kuiper`|`local`|`master`|_localhost_ & LAN
+`homeassistant`|`master`|`master`|LAN
 
-- Data analysis support
+# Instructions
+## Step 1 - Start `kuiper`
+Setup the MQTT broker information to interact with the 
+[Home Assistant](http://home-assistant.io) server 
+and the [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md)  _add-on_.
 
-  - Support data extract, transform and filter through SQL 
-  - Data order, group, aggregation and join
-  - 60+ functions, includes mathematical, string, aggregate and hash etc
-  - 4 time windows
 
-- Highly extensibile 
+```
+export MQTT_HOST=127.0.0.1
+export MQTT_USERNAME=username
+export MQTT_PASSWORD=password
+export MQTT_PORT=1883
+export KUIPER_VERSION=0.2.1
 
-  Plugin system is provided,  and it supports to extend at ``Source``, ``SQL functions `` and ``Sink``.
+docker run -d --name kuiper -e MQTT_BROKER_ADDRESS=tcp://${MQTT_USERNAME}:${MQTT_PASSWORD}@${MQTT_HOST}:${MQTT_PORT} emqx/kuiper:${KUIPER_VERSION}
+```
 
-  - Source: embedded support for MQTT, and provide extension points for sources
-  - Sink: embedded support for MQTT and HTTP, and provide extension points for sinks
-  - UDF functions: embedded support for 60+ functions, and provide extension points for SQL functions
+## Step 2 - Start Motion &Atilde;&#128065;
 
-- Management
+### Step 2.1 - Start `motion` _add-on_
+The `motion` _add-on_ publishes information at the end of each motion detection event.  The JSON payload sent to the MQTT topic is specified for a _group_, _device_, and _camera_, respectively; alternatively a `+`may be used for _all_. 
 
-  - Stream and rule management through CLI
-  - Stream and rule management through REST API (In planning)
-  - Easily be integrate with [KubeEdge](https://github.com/kubeedge/kubeedge) and [K3s](https://github.com/rancher/k3s), which bases Kubernetes
+**Please refer to the [`motion-ai`](http://github.com/dcmartin/motion-ai) repository for installation and operation instructions.**
 
-- Integration with EMQ X Edge
+### Step 2.2 - Start `yolo4motion` _service_
 
-  Seamless integration with EMQ X Edge, and provided an end to end solution from messaging to analytics. 
+```
+MOTION_CLIENT='+' ./sh/yolo4motion.sh
+```
 
-## Quick start
+### Step 2.3 - Monitor `yolo4motion` _service_ 
+Listen for end events using `mosquitto_sub` from the `mosquitto-clients` _apt_ package:
 
-1. Pull a Kuiper Docker image from ``https://hub.docker.com/r/emqx/kuiper/tags``.
+```
+mosquitto_sub -h ${MQTT_HOST} -p ${MQTT_PORT} -u ${MQTT_USERNAME} -P ${MQTT_PASSWORD} -t '+/+/+/event/end/+'
+```
 
-2. Set Kuiper source to an MQTT server. This sample uses server locating at ``tcp://broker.emqx.io:1883``. ``broker.emqx.io`` is a public MQTT test server hosted by [EMQ](https://www.emqx.io).
+This command should produce an output similar to the following with notable redactions for BASE64 encoded `image` attributes.
 
-   ```shell
-   docker run -d --name kuiper -e MQTT_BROKER_ADDRESS=tcp://broker.emqx.io:1883 emqx/kuiper:$tag
-   ```
+```
+{
+  "timestamp": "2020-03-25T19:51:19Z",
+  "log_level": "debug",
+  "debug": false,
+  "group": "motion",
+  "device": "+",
+  "camera": "+",
+  "event": {
+    "group": "motion",
+    "device": "ftpcams",
+    "camera": "dogyard",
+    "event": "421",
+    "start": 1585165867,
+    "timestamp": {
+      "start": "2020-03-25T19:51:07Z",
+      "end": "2020-03-25T19:51:11Z",
+      "publish": "2020-03-25T19:51:15Z"
+    },
+    "id": "20200325195111-421",
+    "end": 1585165875,
+    "elapsed": 3,
+    "images": [
+      {
+        "device": "ftpcams", "camera": "dogyard", "type": "jpeg", "timestamp": "2020-03-25T19:51:10Z", "date": 1585165870, "seqno": "20200325195110-421-01", "event": "421", "id": "20200325195110-421-01", "center": { "x": 320, "y": 240 }, "width": 100, "height": 100, "size": 10000, "noise": 0 }, 
+      ...
+    ],
+    "date": 1585165875,
+    "image": "<BASE64-encoded-original>"
+  },
+  "old": 300,
+  "payload": "image/end",
+  "topic": "motion/+/+",
+  "services": [ { "name": "mqtt", "url": "http://mqtt" } ],
+  "mqtt": { "host": "127.0.0.1", "port": 1883, "username": "username", "password": "password" },
+  "yolo": {
+    "log_level": "debug",
+    "debug": false,
+    "timestamp": "2020-03-20T17:51:16Z",
+    "date": 1584726676,
+    "period": 60,
+    "entity": "all",
+    "scale": "none",
+    "config": "tiny-v3",
+    "services": [ { "name": "mqtt", "url": "http://mqtt" } ],
+    "darknet": {
+      "threshold": 0.25,
+      "weights_url": "http://pjreddie.com/media/files/yolov3-tiny.weights",
+      "weights": "/openyolo/darknet/yolov3-tiny.weights",
+      "weights_md5": "3bcd6b390912c18924b46b26a9e7ff53",
+      "cfg": "/openyolo/darknet/cfg/yolov3-tiny.cfg",
+      "data": "/openyolo/darknet/cfg/coco.data",
+      "names": "/openyolo/darknet/data/coco.names"
+    },
+    "names": [ "person", "bicycle", .. ]
+  },
+  "date": 1585165879,
+  "info": {
+    "type": "JPEG",
+    "size": "640x480",
+    "bps": "8-bit",
+    "color": "sRGB"
+  },
+  "time": 0.172631,
+  "count": 0,
+  "detected": null,
+  "image": "<BAS64-encoded-annotated>"
+}
+```
 
-3. Create a stream - the stream is your stream data schema, similar to table definition in database. Let's say the temperature & humidity data are sent to ``broker.emqx.io``, and those data will be processed in your **LOCAL RUN** Kuiper docker instance.  Below steps will create a stream named ``demo``, and data are sent to ``devices/device_001/messages`` topic, while ``device_001`` could be other devices, such as ``device_002``, all of those data will be subscribed and handled by ``demo`` stream.
+## Step 3 - Streams for `motion` _add-on_
+A stream may consume from any MQTT broker according to a specified MQTT _topic_.  A schema may be defined for the JSON data received or a schema will automatically be generared.
 
-   ```shell
-   -- In host
-   # docker exec -it kuiper /bin/sh
-   
-   -- In docker instance
-   # bin/cli create stream demo '(temperature float, humidity bigint) WITH (FORMAT="JSON", DATASOURCE="devices/+/messages")'
-   Connecting to 127.0.0.1:20498...
-   Stream demo is created.
-   
-   # bin/cli query
-   Connecting to 127.0.0.1:20498...
-   kuiper > select * from demo where temperature > 30;
-   Query was submit successfully.
-   
-   ```
+Topic|Stream
+---|---|
+`+/+/+/event/end`|`motion_end`
+`+/+/+/event/end/+`|`motion_annotated`
 
-4. Publish sensor data to topic ``devices/device_001/messages`` of server ``tcp://broker.emqx.io:1883`` with any [MQTT client tools](https://medium.com/@emqtt/mqtt-client-tools-215ff7a17ad). Below sample uses ``mosquitto_pub``. 
+### Step 3.1 - Create stream `motion_end`
+This command creates a new stream listening for motion detection end events for any _group_, _device_, _camera_ combination; the schema is left undefined, i.e. `()`, and will be discovered based on JSON payloads received.  **Note:** this command will fail if the stream name is already in-use.
 
-   ```shell
-   # mosquitto_pub -h broker.emqx.io -m '{"temperature": 40, "humidity" : 20}' -t devices/device_001/messages
-   ```
+```
+docker exec -it kuiper bin/cli create stream motion_end '() WITH FORMAT="JSON", DATASOURCE="+/+/+/event/end"'
+```
 
-5. If everything goes well,  you can see the message is print on docker ``bin/cli query`` window. Please try to publish another message with ``temperature`` less than 30, and it will be filtered by WHERE condition of the SQL. 
+### Step 3.2 -  Create stream `motion_annotated`
+Messages are sent by the `yolo4motion` service as a result of processing the motion detection end event.  In this example the schema is **defined** to include only the `count`, `detected`, and `event` attributes (n.b. see JSON above).  In addition, the `event` schema inclues onlly the `device` and `camera` attributes (see table).
 
-   ```
-   kuiper > select * from demo WHERE temperature > 30;
-   [{"temperature": 40, "humidity" : 20}]
-   ```
+Attribute|Schema
+---|---|
+count|bigint
+detected|array(struct(entity string,count bigint))
+event|struct(device string, camera string)
 
-   If having any problems, please take a look at ``log/stream.log``.
+This command creates a new stream listening for motion detection annotation messages
 
-6. To stop the test, just press ``ctrl + c `` in ``bin/cli query`` command console, or input `exit` and press enter.
+```
+docker exec -it kuiper bin/cli create stream motion_annotated \
+  '(count bigint,detected array(struct(entity string,count bigint)),event struct(device string, camera string)) WITH (FORMAT="JSON", DATASOURCE="+/+/+/event/end/+")'
+```
 
-7. Next for exploring more powerful features of EMQ X  Kuiper? Refer to below for how to apply EMQ X Kuiper in edge and integrate with AWS / Azure IoT cloud.
+### Step 3.3 - `show streams`
 
-   - [Lightweight edge computing EMQ X Kuiper and Azure IoT Hub integration solution](https://www.emqx.io/blog/85) 
-   - [Lightweight edge computing EMQ X Kuiper and AWS IoT Hub integration solution](https://www.emqx.io/blog/88)
+```
+docker exec -it kuiper bin/cli show streams
+Connecting to 127.0.0.1:20498... 
+motion_annotated
+```
 
-## Performance test result
+### Step 3.4 - `describe`  _stream_
 
-### Throughput test
+```
+docker exec -it kuiper bin/cli describe stream motion_annotated
+Connecting to 127.0.0.1:20498... 
+Fields
+--------------------------------------------------------------------------------
+count	bigint
+detected	array(struct(entity string, count bigint))
+event	struct(device string, camera string)
 
-- Using JMeter MQTT plugin to send simulation data to EMQ X Broker, such as: ``{"temperature": 10, "humidity" : 90}``, the value of temperature and humidity are random integer between 0 - 100.
-- Kuiper subscribe from EMQ X Broker, and analyze data with SQL: ``SELECT * FROM demo WHERE temperature > 50 `` 
-- The analysis result are wrote to local file by using [file sink plugin](docs/en_US/plugins/sinks/file.md).
+DATASOURCE: +/+/+/event/end/+
+FORMAT: JSON
+```
 
-| Devices                                        | Message # per second | CPU usage     | Memory usage |
-| ---------------------------------------------- | -------------------- | ------------- | ------------ |
-| Raspberry Pi 3B+                               | 12k                  | sys+user: 70% | 20M          |
-| AWS t2.micro( 1 Core * 1 GB) <br />Ubuntu18.04 | 10k                  | sys+user: 25% | 20M          |
+### Step 3.5 - `drop`  _stream_
+The `motion_end` stream will not be used further, so it may optionally be deleted or _dropped_; for example:
 
-### Max number of rules support
+```
+docker exec -it kuiper bin/cli drop stream motion_end
+```
 
-- 8000 rules with 800 message/second
-- Configurations
-  - 2 core * 4GB memory in AWS
-  - Ubuntu
-- Resource usage
-  - Memory: 89% ~ 72%
-  - CPU: 25%
-  - 400KB - 500KB / rule
-- Rule
-  - Source: MQTT
-  - SQL: SELECT temperature FROM source WHERE temperature > 20 (90% data are filtered) 
-  - Sink: Log
+## Step 4 - Rules for `motion_annotated` _stream_
+Rules may only be created in reference to a previously defined _stream_.
 
-## Documents
+### Step 4.1 -  Create _rule_
+Define a SQL statement to extract the information from the stream; use `*` to indicate everything defined (or discovered). For example, using the interactive command-line:
 
-- [Getting started](docs/en_US/getting_started.md) 
+```
+docker exec -it kuiper bin/cli query
+select * from motion_annotated where count > 0;
+quit
+```
 
-- [Reference guide](docs/en_US/reference.md)
-  - [Install and operation](docs/en_US/operation/overview.md)
-  - [Command line interface tools - CLI](docs/en_US/cli/overview.md)
-  - [Kuiper SQL reference](docs/en_US/sqls/overview.md)
-  - [Rules](docs/en_US/rules/overview.md)
-  - [Extend Kuiper](docs/en_US/extension/overview.md)
-  - [Plugins](docs/en_US/plugins/overview.md)
+Rules may also be defined using a JSON structure and provides both an `sql` statement as well as an array of `actions`.  There are two types of action available:
 
-## Build from source
++ `log` - record to a log file or standard output
++ `mqtt` - publish the SQL results as JSON
 
-#### Preparation
+For example to publish the entire contents of the `motion_annotated` stream payload(s) to the `master` MQTT broker, **if** the `count` of entities detected is positive (**n.b.** `MQTT_HOST` change to `master`):
 
-- Go version >= 1.11
+```
+export MQTT_HOST=192.168.1.50
+cat > motion_detected.json << EOF
+{
+  "sql": "SELECT * from motion_annotated where count > 0",
+  "actions": [
+    {
+      "mqtt": {
+        "server": "tcp://${MQTT_USERNAME}:${MQTT_PASSWORD}@${MQTT_HOST}:${MQTT_PORT}",
+        "topic": "kuiper/detected"
+      }
+    }
+  ]
+}
+EOF
+```
 
-#### Compile
+Copy the file into the `kuiper` container and create the _rule_, for example:
 
-+ Binary: 
+```
+docker cp motion_detected.json kuiper:/tmp/motion_detected.json
+docker exec -it kuiper bin/cli create rule motion_detected  -f /tmp/motion_detected.json
+```
 
-  - Binary: `$ make`
+### Step 4.2 - `describe` _rule_
 
-  - Binary files that support EdgeX: `$ make build_with_edgex`
+```
+docker exec -it kuiper bin/cli describe rule motion_detected
+Connecting to 127.0.0.1:20498... 
+{
+  "sql": "SELECT * from motion_annotated where count > 0",
+  "actions": [
+    {
+      "mqtt": {
+        "server": "tcp://username:password@192.168.1.50:1883",
+        "topic": "kuiper/detected"
+      }
+    }
+  ]
+}
+```
 
-+ Packages: `` $ make pkg``
+## &#9989; - COMPLETE
+The `kuiper` container will continue to relay MQTT payloads from the `local` broker to the `master` broker whenever the count of detected entities is positive.  Subscribe the to `kuiper/detected` topic on the same MQTT broker to observe payloads processed by the rule, for example:
 
-  - Packages: `$ make pkg`
+```
+export MQTT_HOST=192.168.1.50
+mosquitto_sub -h ${MQTT_HOST} -p ${MQTT_PORT} -u ${MQTT_USERNAME} -P ${MQTT_PASSWORD} -t 'kuiper/detected'
+```
 
-  - Packages files that support EdgeX: `$ make pkg_with_edgex`
+```
+[{"count":2,"detected":[{"count":2,"entity":"person"}],"event":{"camera":"foyer","device":"ftpcams"}}]
+[{"count":2,"detected":[{"count":2,"entity":"person"}],"event":{"camera":"foyer","device":"ftpcams"}}]
+```
 
-+ Docker images: `$ make docker`
 
-  > Docker images support EdgeX by default
+# `Command-line reference`
 
-To using cross-compilation, refer to [this doc](docs/en_US/cross-compile.md).
+### `drop` _rule_
+```
+docker exec -it kuiper bin/cli drop rule motion_detected
+```
 
-## Open source license
+### `show rules`
+The system provides support for _streams_ which read from the MQTT broker according to a specified _topic_ and _rules_ which process data received on a stream.  The inventory can be shown using the following commands:
 
-[Apache 2.0](LICENSE)
+```
+docker exec -it kuiper bin/cli show rules
+```
+
+### `getstatus` _rule_
+
+```
+docker exec -it kuiper bin/cli getstatus rule motion_detected
+```
+
+```
+{
+  "source_motion_0_records_in_total": 0,
+  "source_motion_0_records_out_total": 0,
+  "source_motion_0_exceptions_total": 0,
+  "source_motion_0_process_latency_ms": 0,
+  "source_motion_0_buffer_length": 0,
+  "source_motion_0_last_invocation": 0,
+  "op_preprocessor_motion_0_records_in_total": 0,
+  "op_preprocessor_motion_0_records_out_total": 0,
+  "op_preprocessor_motion_0_exceptions_total": 0,
+  "op_preprocessor_motion_0_process_latency_ms": 0,
+  "op_preprocessor_motion_0_buffer_length": 0,
+  "op_preprocessor_motion_0_last_invocation": 0,
+  "op_filter_0_records_in_total": 0,
+  "op_filter_0_records_out_total": 0,
+  "op_filter_0_exceptions_total": 0,
+  "op_filter_0_process_latency_ms": 0,
+  "op_filter_0_buffer_length": 0,
+  "op_filter_0_last_invocation": 0,
+  "op_project_0_records_in_total": 0,
+  "op_project_0_records_out_total": 0,
+  "op_project_0_exceptions_total": 0,
+  "op_project_0_process_latency_ms": 0,
+  "op_project_0_buffer_length": 0,
+  "op_project_0_last_invocation": 0,
+  "sink_sink_mqtt_0_records_in_total": 0,
+  "sink_sink_mqtt_0_records_out_total": 0,
+  "sink_sink_mqtt_0_exceptions_total": 0,
+  "sink_sink_mqtt_0_process_latency_ms": 0,
+  "sink_sink_mqtt_0_buffer_length": 0,
+  "sink_sink_mqtt_0_last_invocation": 0
+}
+```
+
+# BUILD
+To build the software the following items need to be installed and configured:
+
++ `Go` language - install using `sudo apt install -qq -y golang`
+
+#  Further Information 
+
+# Changelog & Releases
+
+Releases are based on Semantic Versioning, and use the format
+of ``MAJOR.MINOR.PATCH``. In a nutshell, the version will be incremented
+based on the following:
+
+- ``MAJOR``: Incompatible or major changes.
+- ``MINOR``: Backwards-compatible new features and enhancements.
+- ``PATCH``: Backwards-compatible bugfixes and package updates.
+
+## Authors & contributors
+
+David C Martin (github@dcmartin.com)
+
+## `CLOC`
+
+Language|files|blank|comment|code
+:-------|-------:|-------:|-------:|-------:
+Go|99|1950|471|24865
+Markdown|79|2053|0|4700
+YAML|14|42|62|698
+Bourne Shell|6|60|44|201
+make|1|19|0|110
+JSON|3|1|0|86
+Dockerfile|2|12|0|15
+--------|--------|--------|--------|--------
+SUM:|204|4137|577|30675
+
+## Stargazers
+[![Stargazers over time](https://starchart.cc/dcmartin/kuiper.svg)](https://starchart.cc/dcmartin/kuiper)

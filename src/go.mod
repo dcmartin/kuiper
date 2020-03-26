@@ -1,4 +1,5 @@
-module github.com/emqx/kuiper
+#module github.com/emqx/kuiper
+module github.com/dcmartin/kuiper
 
 require (
 	github.com/benbjohnson/clock v1.0.0

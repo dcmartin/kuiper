@@ -1,0 +1,11 @@
+{
+  "sql": "SELECT * from motion_annotated where count > 0",
+  "actions": [
+    {
+      "mqtt": {
+        "server": "tcp://username:password@192.168.1.50:1883",
+        "topic": "kuiper/detected"
+      }
+    }
+  ]
+}
