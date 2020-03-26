@@ -1,10 +1,26 @@
 
-# `motion`  &Atilde;&#128065;
-This document describes an example use-case for `kuiper` relaying MQTT traffic for [`motion-ai`](http://github.com/dcmartin/motion-ai), an AI assistant for situational awareness from Web cameras.
+# &#128738;`kuiper4motion` - `MQTT` relay using `SQL`
 
-In this scenario the [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md) _add-on_ for [Home Assistant](http://home-assistant.io) publishes motion detection events to an MQTT broker, typically running on the same device.  The motion detection events are consumed by [`yolo4motion`](http://github.com/dcmartin/open-horizon/tree/master/yolo4motion/README.md), an [Open Horizon](http://github.com/open-horizon) micro-service, which provides object detection and classification using [OpenYOLO](http://github.com/dcmartin/openyolo).
+This document describes an example use-case for [`kuiper`](http://github.com/dcmartin/kuiper) relaying MQTT traffic for [Motion &Atilde;&#128065;](http://github.com/dcmartin/motion-ai)
+
+## Motion &Atilde;&#128065;
+Motion &Atilde;&#128065; provides a set of AI assistants for situational awareness from Web cameras using a combination of the following components:
+
++ [Home Assistant](http://home-assistant.io) 
++ Home Assistant _add-on_ [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md) 
++ [Open Horizon](http://github.com/open-horizon) _edge_ service [`yolo4motion`](http://github.com/dcmartin/open-horizon/tree/master/yolo4motion/README.md)
+
+
+### Operational Scenario
+
+In this scenario the [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md) _add-on_ for [Home Assistant](http://home-assistant.io) publishes motion detection events to an MQTT broker running on the same device.  The motion detection JSON payloads are consumed by [`yolo4motion`](http://github.com/dcmartin/open-horizon/tree/master/yolo4motion/README.md), an [Open Horizon](http://github.com/open-horizon) _edge_ service, which provides object detection and classification using [OpenYOLO](http://github.com/dcmartin/openyolo).
 
 The `kuiper` software provides a relay from the `local` MQTT broker to the `master` MQTT broker, but only transmits a limited set of information, notably the `count` of entities annotated, an _array_ of each entity type and count, and the motion detection event `device` and `camera`.
+
+In this example:
+
++ `local` - `127.0.0.1`
++ `master` - `192.168.1.50`
 
 _Actor_|Subscribe|Publish|Network
 ----|----|----|----
@@ -14,13 +30,8 @@ _Actor_|Subscribe|Publish|Network
 `kuiper`|`local`|`master`|_localhost_ & LAN
 `homeassistant`|`master`|`master`|LAN
 
-In this example:
-
-+ `local` - `127.0.0.1`
-+ `master` - `192.168.1.50`
-
-
-## Start `kuiper`
+# Instructions
+## Step 1 - Start `kuiper`
 Setup the MQTT broker information to interact with the 
 [Home Assistant](http://home-assistant.io) server 
 and the [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md)  _add-on_.
@@ -36,16 +47,27 @@ export KUIPER_VERSION=0.2.1
 docker run -d --name kuiper -e MQTT_BROKER_ADDRESS=tcp://${MQTT_USERNAME}:${MQTT_PASSWORD}@${MQTT_HOST}:${MQTT_PORT} emqx/kuiper:${KUIPER_VERSION}
 ```
 
-## Start `motion` _add-on_
-The `motion` _add-on_ publishes information at the end of each motion detection event.  The JSON payload sent to the MQTT topic is specified for a _group_, _device_, and _camera_, respectively; alternatively a `+`may be used for _all_.   Please refer to the [`motion-ai`](http://github.com/dcmartin/motion-ai) repository for installation and operation.
+## Step 2 - Start Motion &Atilde;&#128065;
 
-For example, listen for end events using software from the `mosquitto-clients` _apt_ package:
+### Step 2.1 - Start `motion` _add-on_
+The `motion` _add-on_ publishes information at the end of each motion detection event.  The JSON payload sent to the MQTT topic is specified for a _group_, _device_, and _camera_, respectively; alternatively a `+`may be used for _all_. 
+
+**Please refer to the [`motion-ai`](http://github.com/dcmartin/motion-ai) repository for installation and operation instructions.**
+
+### Step 2.2 - Start `yolo4motion` _service_
 
 ```
-mosquitto_sub -h ${MQTT_HOST} -p ${MQTT_PORT} -u ${MQTT_USERNAME} -P ${MQTT_PASSWORD} -t '+/+/+/event/end'
+MOTION_CLIENT='+' ./sh/yolo4motion
 ```
 
-Produces an output similar to the following (with notable redactions for BASE64 encoded images):
+### Step 2.3 - Monitor `yolo4motion` _service_ 
+Listen for end events using `mosquitto_sub` from the `mosquitto-clients` _apt_ package:
+
+```
+mosquitto_sub -h ${MQTT_HOST} -p ${MQTT_PORT} -u ${MQTT_USERNAME} -P ${MQTT_PASSWORD} -t '+/+/+/event/end/+'
+```
+
+This command should produce an output similar to the following with notable redactions for BASE64 encoded `image` attributes.
 
 ```
 {
@@ -117,7 +139,7 @@ Produces an output similar to the following (with notable redactions for BASE64 
 }
 ```
 
-## Streams for `motion` _add-on_
+## Step 3 - Streams for `motion` _add-on_
 A stream may consume from any MQTT broker according to a specified MQTT _topic_.  A schema may be defined for the JSON data received or a schema will automatically be generared.
 
 Topic|Stream
@@ -125,14 +147,14 @@ Topic|Stream
 `+/+/+/event/end`|`motion_end`
 `+/+/+/event/end/+`|`motion_annotated`
 
-### Create stream named `motion_end`
+### Step 3.1 - Create stream `motion_end`
 This command creates a new stream listening for motion detection end events for any _group_, _device_, _camera_ combination; the schema is left undefined, i.e. `()`, and will be discovered based on JSON payloads received.  **Note:** this command will fail if the stream name is already in-use.
 
 ```
 docker exec -it kuiper bin/cli create stream motion_end '() WITH FORMAT="JSON", DATASOURCE="+/+/+/event/end"'
 ```
 
-### Create stream named `motion_annotated`
+### Step 3.2 -  Create stream `motion_annotated`
 Messages are sent by the `yolo4motion` service as a result of processing the motion detection end event.  In this example the schema is **defined** to include only the `count`, `detected`, and `event` attributes (n.b. see JSON above).  In addition, the `event` schema inclues onlly the `device` and `camera` attributes (see table).
 
 Attribute|Schema
@@ -148,7 +170,7 @@ docker exec -it kuiper bin/cli create stream motion_annotated \
   '(count bigint,detected array(struct(entity string,count bigint)),event struct(device string, camera string)) WITH (FORMAT="JSON", DATASOURCE="+/+/+/event/end/+")'
 ```
 
-### `show streams`
+### Step 3.3 - `show streams`
 
 ```
 docker exec -it kuiper bin/cli show streams
@@ -156,7 +178,7 @@ Connecting to 127.0.0.1:20498...
 motion_annotated
 ```
 
-### `describe`  _stream_
+### Step 3.4 - `describe`  _stream_
 
 ```
 docker exec -it kuiper bin/cli describe stream motion_annotated
@@ -171,17 +193,18 @@ DATASOURCE: +/+/+/event/end/+
 FORMAT: JSON
 ```
 
-### `drop`  _stream_
-This stream will not be used further, so it may be deleted or _dropped_; for example:
+### Step 3.5 - `drop`  _stream_
+The `motion_end` stream will not be used further, so it may optionally be deleted or _dropped_; for example:
 
 ```
 docker exec -it kuiper bin/cli drop stream motion_end
 ```
 
-# Rules
+## Step 4 - Rules for `motion_annotated` _stream_
+Rules may only be created in reference to a previously defined _stream_.
 
-## Create a _rule_
-Define a SQL statement to extract the information from the stream, for example use `*` to indicate everything defined (or discovered); for example using the interactive command-line:
+### Step 4.1 -  Create _rule_
+Define a SQL statement to extract the information from the stream; use `*` to indicate everything defined (or discovered). For example, using the interactive command-line:
 
 ```
 docker exec -it kuiper bin/cli query
@@ -189,7 +212,12 @@ select * from motion_annotated where count > 0;
 quit
 ```
 
-Rules may also be defined using a JSON structure.  There are two types of `actions` available: `log` to record to a log file or standard output; and `mqtt` to publish the SQL results as JSON, for example to publish to the `master` MQTT broker:
+Rules may also be defined using a JSON structure and provides both an `sql` statement as well as an array of `actions`.  There are two types of action available:
+
++ `log` - record to a log file or standard output
++ `mqtt` - publish the SQL results as JSON
+
+For example to publish the entire contents of the `motion_annotated` stream payload(s) to the `master` MQTT broker, **if** the `count` of entities detected is positive (**n.b.** `MQTT_HOST` change to `master`):
 
 ```
 export MQTT_HOST=192.168.1.50
@@ -208,14 +236,14 @@ cat > motion_detected.json << EOF
 EOF
 ```
 
-This file may then be copied into the `kuiper` container and submitted to create the _rule_, for example:
+Copy the file into the `kuiper` container and create the _rule_, for example:
 
 ```
 docker cp motion_detected.json kuiper:/tmp/motion_detected.json
 docker exec -it kuiper bin/cli create rule motion_detected  -f /tmp/motion_detected.json
 ```
 
-### `describe` _rule_
+### Step 4.2 - `describe` _rule_
 
 ```
 docker exec -it kuiper bin/cli describe rule motion_detected
@@ -233,9 +261,11 @@ Connecting to 127.0.0.1:20498...
 }
 ```
 
-Subscribe the to `kuiper/detected` topic on the same MQTT broker to observe payloads processed by the rule, for example:
+## &#9989; - COMPLETE
+The `kuiper` container will continue to relay MQTT payloads from the `local` broker to the `master` broker whenever the count of detected entities is positive.  Subscribe the to `kuiper/detected` topic on the same MQTT broker to observe payloads processed by the rule, for example:
 
 ```
+export MQTT_HOST=192.168.1.50
 mosquitto_sub -h ${MQTT_HOST} -p ${MQTT_PORT} -u ${MQTT_USERNAME} -P ${MQTT_PASSWORD} -t 'kuiper/detected'
 ```
 
@@ -244,9 +274,8 @@ mosquitto_sub -h ${MQTT_HOST} -p ${MQTT_PORT} -u ${MQTT_USERNAME} -P ${MQTT_PASS
 [{"count":2,"detected":[{"count":2,"entity":"person"}],"event":{"camera":"foyer","device":"ftpcams"}}]
 ```
 
-# APPENDIX
 
-## Command-line reference
+# `Command-line reference`
 
 ### `drop` _rule_
 ```
@@ -300,4 +329,35 @@ docker exec -it kuiper bin/cli getstatus rule motion_detected
   "sink_sink_mqtt_0_last_invocation": 0
 }
 ```
+#  Further Information 
 
+# Changelog & Releases
+
+Releases are based on Semantic Versioning, and use the format
+of ``MAJOR.MINOR.PATCH``. In a nutshell, the version will be incremented
+based on the following:
+
+- ``MAJOR``: Incompatible or major changes.
+- ``MINOR``: Backwards-compatible new features and enhancements.
+- ``PATCH``: Backwards-compatible bugfixes and package updates.
+
+## Authors & contributors
+
+David C Martin (github@dcmartin.com)
+
+## `CLOC`
+
+Language|files|blank|comment|code
+:-------|-------:|-------:|-------:|-------:
+Go|99|1950|471|24865
+Markdown|79|2053|0|4700
+YAML|14|42|62|698
+Bourne Shell|6|60|44|201
+make|1|19|0|110
+JSON|3|1|0|86
+Dockerfile|2|12|0|15
+--------|--------|--------|--------|--------
+SUM:|204|4137|577|30675
+
+## Stargazers
+[![Stargazers over time](https://starchart.cc/dcmartin/kuiper.svg)](https://starchart.cc/dcmartin/kuiper)
