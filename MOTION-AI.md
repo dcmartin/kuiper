@@ -54,7 +54,7 @@ The `motion` _add-on_ publishes information at the end of each motion detection 
 ### Step 2.2 - Start `yolo4motion` _service_
 
 ```
-MOTION_CLIENT='+' ./sh/yolo4motion
+MOTION_CLIENT='+' ./sh/yolo4motion.sh
 ```
 
 ### Step 2.3 - Monitor `yolo4motion` _service_ 
