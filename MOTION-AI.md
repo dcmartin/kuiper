@@ -1,10 +1,7 @@
 
 # &#128738;`kuiper4motion` - `MQTT` relay using `SQL`
 
-This document describes an example use-case for [`kuiper`](http://github.com/dcmartin/kuiper) relaying MQTT traffic for [Motion &Atilde;&#128065;](http://github.com/dcmartin/motion-ai)
-
-## Motion &Atilde;&#128065;
-Motion &Atilde;&#128065; provides a set of AI assistants for situational awareness from Web cameras using a combination of the following components:
+This document describes an example use-case for [`kuiper`](http://github.com/dcmartin/kuiper) relaying MQTT traffic for [Motion &Atilde;&#128065;](http://github.com/dcmartin/motion-ai) which provides a set of AI assistants for situational awareness from Web cameras using a combination of the following components:
 
 + [Home Assistant](http://home-assistant.io) 
 + Home Assistant _add-on_ [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md) 
