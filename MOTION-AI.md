@@ -5,12 +5,12 @@ This document describes an example use-case for [`kuiper`](http://github.com/dcm
 
 + [Home Assistant](http://home-assistant.io) 
 + Home Assistant _add-on_ [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md) 
-+ [Open Horizon](http://github.com/open-horizon) _edge_ service [`yolo4motion`](http://github.com/dcmartin/open-horizon/tree/master/yolo4motion/README.md)
++ [Open Horizon](http://github.com/open-horizon) _edge_ service [`yolo4motion`](http://github.com/dcmartin/open-horizon/tree/master/services/yolo4motion/README.md)
 
 
 ### Operational Scenario
 
-In this scenario the [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md) _add-on_ for [Home Assistant](http://home-assistant.io) publishes motion detection events to an MQTT broker running on the same device.  The motion detection JSON payloads are consumed by [`yolo4motion`](http://github.com/dcmartin/open-horizon/tree/master/yolo4motion/README.md), an [Open Horizon](http://github.com/open-horizon) _edge_ service, which provides object detection and classification using [OpenYOLO](http://github.com/dcmartin/openyolo).
+In this scenario the [`motion`](http://github.com/dcmartin/hassio-addons/tree/master/motion/README.md) _add-on_ for [Home Assistant](http://home-assistant.io) publishes motion detection events to an MQTT broker running on the same device.  The motion detection JSON payloads are consumed by [`yolo4motion`](http://github.com/dcmartin/open-horizon/tree/master/services/yolo4motion/README.md), an [Open Horizon](http://github.com/open-horizon) _edge_ service, which provides object detection and classification using [OpenYOLO](http://github.com/dcmartin/openyolo).
 
 The `kuiper` software provides a relay from the `local` MQTT broker to the `master` MQTT broker, but only transmits a limited set of information, notably the `count` of entities annotated, an _array_ of each entity type and count, and the motion detection event `device` and `camera`.
 
