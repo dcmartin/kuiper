@@ -1,0 +1,10 @@
+{
+  "ports": {
+    "host": 20498,
+    "container": 9081
+  },
+  "prometheus": {
+    "on": false,
+    "port": 20499
+  }
+}
