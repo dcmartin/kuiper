@@ -336,6 +336,19 @@ To build the software the following items need to be installed and configured:
 + `Go` language - install using `sudo apt install -qq -y golang`
 
 #  Further Information 
+For more information on Kuiper, visit the original [repository](https://github.com/emqx/kuiper) and the [documentation](https://docs.emqx.io/kuiper/latest/en/).
+
+## A. [Streams](https://docs.emqx.io/kuiper/latest/en/sqls/streams.html)
+In Kuiper, each column or an expression has a related data type. A data type describes (and constrains) the set of values that a column of that type can hold or an expression of that type can produce.
+
+## B. Query [language](https://docs.emqx.io/kuiper/latest/en/sqls/query_language_elements.html)
+Kuiper provides a variety of `SQL` language elements for building queries.
+
+## C. Query [`windows`](https://docs.emqx.io/kuiper/latest/en/sqls/windows.html)
+In time-streaming scenarios, performing operations on the data contained in temporal windows is a common pattern. Kuiper has native support for windowing functions, enabling you to author complex stream processing jobs with minimal effort.
+
+## D. [Functions](https://docs.emqx.io/kuiper/latest/en/sqls/built-in_functions.html)
+Kuiper has many built-in functions for performing calculations on data.
 
 # Changelog & Releases
 
