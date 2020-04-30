@@ -331,11 +331,13 @@ docker exec -it kuiper bin/cli getstatus rule motion_detected
 ```
 
 # BUILD
-To build the software the following items need to be installed and configured:
 
-+ `Go` language - install using `sudo apt install -qq -y golang`
+```
+docker build -t kuiper src/
+```
 
 #  Further Information 
+See the [primary repository](https://github.com/emqx/kuiper) 
 
 # Changelog & Releases
 
